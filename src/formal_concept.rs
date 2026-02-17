@@ -7,8 +7,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct FormalConcept<A = String, B = String> {
     pub context: Arc<FormalContext<A, B>>,
-    pub extent: BitVec, // A subset of objects
-    pub intent: BitVec, // A subset of attributes
+    pub data: RawFormalConcept,
 }
 
 /// A RawFormalConcept is optimized for efficiency -- it simply stores a pair of an extent and an intent.
@@ -20,16 +19,12 @@ pub struct RawFormalConcept {
 
 impl RawFormalConcept {
     /// Checks that the RawFormalConcept is actually a valid concept for the provided context.
-    pub fn to_formal_concept<A, B>(
-        &self,
-        context: Arc<FormalContext<A, B>>,
-    ) -> FormalConcept<A, B> {
+    pub fn to_formal_concept<A, B>(self, context: Arc<FormalContext<A, B>>) -> FormalConcept<A, B> {
         assert_eq!(context.objects.len(), self.extent.len());
         assert_eq!(context.attributes.len(), self.intent.len());
         let result = FormalConcept {
             context,
-            extent: self.extent.clone(),
-            intent: self.intent.clone(),
+            data: self,
         };
         assert!(result.validate());
         result
@@ -38,30 +33,34 @@ impl RawFormalConcept {
 
 impl<A: std::fmt::Debug, B: std::fmt::Debug> std::fmt::Display for FormalConcept<A, B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let extent: Vec<_> = self
-            .extent
-            .iter_ones()
-            .map(|i| &self.context.objects[i])
-            .collect();
-        let intent: Vec<_> = self
-            .intent
-            .iter_ones()
-            .map(|j| &self.context.attributes[j])
-            .collect();
+        let extent: Vec<_> = self.extent_names_iter().collect();
+        let intent: Vec<_> = self.extent_names_iter().collect();
         write!(f, "Extent: {:?}, Intent: {:?}", extent, intent)
     }
 }
 
 impl<A, B> FormalConcept<A, B> {
     pub fn validate(&self) -> bool {
-        self.extent == self.context.induce_l(&self.intent)
-            && self.intent == self.context.induce_r(&self.extent)
+        self.data.extent == self.context.induce_l(&self.data.intent)
+            && self.data.intent == self.context.induce_r(&self.data.extent)
+    }
+    pub fn extent_names_iter(&self) -> impl Iterator<Item = &A> {
+        self.data
+            .extent
+            .iter_ones()
+            .map(|i| &self.context.objects[i])
+    }
+    pub fn intent_names_iter(&self) -> impl Iterator<Item = &B> {
+        self.data
+            .intent
+            .iter_ones()
+            .map(|j| &self.context.attributes[j])
     }
 }
 
 impl<A: PartialEq, B: PartialEq> PartialEq for FormalConcept<A, B> {
     fn eq(&self, other: &Self) -> bool {
-        *self.context == *other.context && self.extent == other.extent
+        *self.context == *other.context && self.data == other.data
     }
 }
 
@@ -73,6 +72,21 @@ impl<A: PartialEq, B: PartialEq> PartialOrd for FormalConcept<A, B> {
         if *self.context != *other.context {
             return None; // Cannot compare concepts from different contexts
         }
+        self.data.partial_cmp(&other.data)
+    }
+}
+
+impl PartialEq for RawFormalConcept {
+    fn eq(&self, other: &Self) -> bool {
+        self.extent == other.extent
+    }
+}
+
+impl Eq for RawFormalConcept {}
+
+impl PartialOrd for RawFormalConcept {
+    // Concepts are ordered by subset containment of their extents.
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.extent == other.extent {
             return Some(std::cmp::Ordering::Equal);
         }
