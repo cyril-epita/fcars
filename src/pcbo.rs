@@ -4,27 +4,6 @@ use crate::RawFormalConcept;
 use rayon::iter::walk_tree;
 use rayon::prelude::*;
 
-// impl<A: Clone + Sync, B: Clone + Sync> FormalConcept<A, B> {
-//     fn cbo_children(&self, y: usize) -> Vec<(Self, usize)> {
-//         let mut result = vec![];
-//         for j in self.intent.iter_zeros().filter(|&j| j >= y) {
-//             let c = self.extent.clone() & self.context.get_attribute_extent(j);
-//             let d = self.context.induce_r(&c);
-//             if self.intent[0..j] == d[0..j] {
-//                 result.push((
-//                     Self {
-//                         context: self.context.clone(),
-//                         extent: c,
-//                         intent: d,
-//                     },
-//                     j + 1,
-//                 ));
-//             }
-//         }
-//         result
-//     }
-// }
-
 impl<A: Sync, B: Sync> FormalContext<A, B> {
     /// Returns a parallel iterator over all formal concepts for this formal context.
     pub fn all_concepts_raw_par_iter(&self) -> impl ParallelIterator<Item = RawFormalConcept> {
