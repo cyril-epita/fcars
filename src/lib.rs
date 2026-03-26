@@ -73,9 +73,17 @@ mod tests {
         assert_eq!(context.num_concepts(), 19);
     }
 
-    #[test]
-    fn cnc_1() {
 
+    // Helper function to create test data
+    fn create_hashmap(entries: Vec<(String, String)>) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        for (key, value) in entries {
+            map.insert(key, value);
+        }
+        map
+    }
+    
+    fn create_foo_dataset() -> NominalDataset {
         let objects = vec![
             "humpty".to_string(), "dumpty".to_string(), "sat".to_string(),
             "on".to_string(), "a".to_string(), "wall".to_string()
@@ -122,32 +130,10 @@ mod tests {
             ]),
         ];
         
-        let dataset = NominalDataset::new(objects, attributes, class_attribute, data);
-        
-        println!("Context:\n{}", dataset);
-        dataset.display_summary();
-        println!();
-        
-        // Run CNC algorithm
-        let results = cnc_nominal_classify(&dataset);
-        display_cnc_results(&dataset, &results);
-
-        assert_eq!(8, results.len());
-        //TODO: to add more assert_eq.
+        NominalDataset::new(objects, attributes, class_attribute, data)
     }
-
-    // Helper function to create test data
-    fn create_hashmap(entries: Vec<(String, String)>) -> HashMap<String, String> {
-        let mut map = HashMap::new();
-        for (key, value) in entries {
-            map.insert(key, value);
-        }
-        map
-    }
-
-    #[test]
-    fn cnc_2() {
-
+    
+    fn create_animal_dataset() -> NominalDataset {
         let animal_objects = vec![
             "animal1".to_string(), "animal2".to_string(), "animal3".to_string(),
             "animal4".to_string(), "animal5".to_string()
@@ -193,24 +179,10 @@ mod tests {
             ]),
         ];
         
-        let animal_dataset = NominalDataset::new(
-            animal_objects, animal_attributes, "class".to_string(), animal_data
-        );
-        
-        println!("Context:\n{}", animal_dataset);
-        animal_dataset.display_summary();
-        println!();
-        
-        let animal_results = cnc_nominal_classify(&animal_dataset);
-        display_cnc_results(&animal_dataset, &animal_results);
-    
-        assert_eq!(2, animal_results.len());
-        //TODO: to add more assert_eq.
+        NominalDataset::new(animal_objects, animal_attributes, "class".to_string(), animal_data)
     }
-
-    #[test]
-    fn cnc_3() {
-
+    
+    fn create_weather_dataset() -> NominalDataset {
         let objects = vec![
             "o2".to_string(), "o6".to_string(), "o9".to_string(),
             "o10".to_string(), "o13".to_string()
@@ -264,17 +236,107 @@ mod tests {
             ]),
         ];
         
-        let dataset = NominalDataset::new(objects, attributes, class_attribute, data);
+        NominalDataset::new(objects, attributes, class_attribute, data)
+    }
+
+    #[test]
+    fn cnc_foo() {
+
+        let dataset = create_foo_dataset();
         
         println!("Context:\n{}", dataset);
         dataset.display_summary();
         println!();
         
         // Run CNC algorithm
-        let results = cnc_nominal_classify(&dataset);
+        let results = cnc(&dataset);
+        display_cnc_results(&dataset, &results);
+
+        assert_eq!(8, results.len());
+        //TODO: to add more assert_eq.
+    }
+
+    #[test]
+    fn cnc_animal() {
+
+        let animal_dataset = create_animal_dataset();
+        
+        println!("Context:\n{}", animal_dataset);
+        animal_dataset.display_summary();
+        println!();
+        
+        let animal_results = cnc(&animal_dataset);
+        display_cnc_results(&animal_dataset, &animal_results);
+    
+        assert_eq!(2, animal_results.len());
+        //TODO: to add more assert_eq.
+    }
+
+    #[test]
+    fn cnc_weather() {
+
+        let dataset = create_weather_dataset();
+        
+        println!("Context:\n{}", dataset);
+        dataset.display_summary();
+        println!();
+        
+        // Run CNC algorithm
+        let results = cnc(&dataset);
         display_cnc_results(&dataset, &results);
 
         assert_eq!(1, results.len());
         //TODO: to add more assert_eq.
+    }
+
+    #[test]
+    fn cnc_bp_foo() {
+        let dataset = create_foo_dataset();
+        
+        // Test cnc_bp with all classes (should behave like regular CNC)
+        let bp_all_results = cnc_bp(&dataset, 3);
+        assert_eq!(8, bp_all_results.len());
+        
+        // Test cnc_bp with n > total classes (should behave like all classes)
+        let bp_overflow_results = cnc_bp(&dataset, 5);
+        assert_eq!(8, bp_overflow_results.len());
+        
+        // Test cnc_bp with 2 classes (two most minority)
+        let bp_2_results = cnc_bp(&dataset, 2);
+        assert_eq!(8, bp_2_results.len());
+        
+        // Test cnc_bp with 1 class (most minority)
+        let bp_1_results = cnc_bp(&dataset, 1);
+        assert!(bp_1_results.len() < 8);
+    }
+    
+    #[test]
+    fn cnc_bp_animal() {
+        let dataset = create_animal_dataset();
+        
+        // Test cnc_bp with all classes
+        let bp_all_results = cnc_bp(&dataset, 3);
+        assert_eq!(2, bp_all_results.len());
+        
+        // Test cnc_bp with 2 classes (two most minority)
+        let bp_2_results = cnc_bp(&dataset, 2);
+        assert_eq!(2, bp_2_results.len());
+        
+        // Test cnc_bp with 1 class (most minority)
+        let bp_1_results = cnc_bp(&dataset, 1);
+        assert_eq!(2, bp_1_results.len());
+    }
+    
+    #[test]
+    fn cnc_bp_weather() {
+        let dataset = create_weather_dataset();
+        
+        // Test cnc_bp with all classes (should behave like regular CNC)
+        let bp_all_results = cnc_bp(&dataset, 2);
+        assert_eq!(1, bp_all_results.len());
+        
+        // Test cnc_bp with 1 class (most minority)
+        let bp_1_results = cnc_bp(&dataset, 1);
+        assert_eq!(1, bp_1_results.len());
     }
 }

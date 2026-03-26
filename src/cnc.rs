@@ -297,21 +297,26 @@ pub fn compute_nominal_closure(dataset: &NominalDataset, attr_name: &str, attr_v
     (extent, intent)
 }
 
-/// CNC algorithm for nominal data
+/// CNC algorithm.
 /// Returns all concepts when there are ties in pertinence or frequency
-pub fn cnc_nominal_classify(dataset: &NominalDataset) -> Vec<(String, String, Vec<usize>, HashMap<String, String>)> {
-    let mut results = Vec::new();
+pub fn cnc(dataset: &NominalDataset) -> Vec<(String, String, Vec<usize>, HashMap<String, String>)> {
     
     // Step 1: Find all most pertinent attributes (handle ties)
     let pertinent_attrs = find_most_pertinent_attributes(dataset);
     
     if pertinent_attrs.is_empty() {
-        return results;
+        return Vec::new();
     }
-    
     println!("Most pertinent attribute(s): {:?}", pertinent_attrs);
     
-    // Step 2: For each pertinent attribute, find all most frequent values (handle ties)
+    // Steps 2 and 3 there.
+    cnc_core(pertinent_attrs, dataset)
+}
+
+fn cnc_core(pertinent_attrs: Vec<String>, dataset: &NominalDataset) -> Vec<(String, String, Vec<usize>, HashMap<String, String>)> {
+    let mut results = Vec::new();
+
+    // Step 2 of the CNC algorithm: For each pertinent attribute, find all most frequent values (handle ties)
     for pertinent_attr in &pertinent_attrs {
         let most_frequent_values = find_most_frequent_values(dataset, pertinent_attr);
         
@@ -325,6 +330,80 @@ pub fn cnc_nominal_classify(dataset: &NominalDataset) -> Vec<(String, String, Ve
     }
     
     results
+}
+
+/// CNC-BP : CNC Bottom-Pertinent Attributes. Keeps only the n most minority classes.
+///
+/// n: number of minority classes to keep.
+///
+/// When classes have identical frequencies, all classes at the same frequency level are included.
+/// The function selects complete frequency tiers until reaching or exceeding the requested n classes.
+/// In case all classes share the same frequency (complete tie), all classes are retained regardless of n.
+///
+/// Example: If we have classes A(3), B(2), C(2), D(1) and n=2:
+/// - Keeps D (most minority with 1 object)
+/// - Keeps both B and C (both have 2 objects, tie at second most minority)
+/// - Total: 3 classes kept (D, B, C)
+pub fn cnc_bp(dataset: &NominalDataset, n: usize) -> Vec<(String, String, Vec<usize>, HashMap<String, String>)> {
+
+    // We first get the G.I to not interfere on CNC.
+    let pertinent_attrs = find_most_pertinent_attributes(&dataset);
+    
+    if pertinent_attrs.is_empty() {
+        return Vec::new();
+    }
+    println!("Most pertinent attribute(s) on filtered data: {:?}", pertinent_attrs);
+
+    // Step 1: Get all class values and their distribution
+    let all_class_values = dataset.get_class_values(&(0..dataset.objects.len()).collect::<Vec<_>>());
+    let mut class_counts: HashMap<String, usize> = HashMap::new();
+    for class_val in &all_class_values {
+        *class_counts.entry(class_val.clone()).or_insert(0) += 1;
+    }
+    
+    // Step 2: Sort classes by frequency (ascending) to find minority classes
+    let mut sorted_classes: Vec<_> = class_counts.into_iter().collect();
+    sorted_classes.sort_by_key(|(_, count)| *count);
+    
+    // Get the n most minority class names
+    let minority_classes: HashSet<String> = sorted_classes.into_iter()
+        .take(n)
+        .map(|(class_name, _)| class_name)
+        .collect();
+    
+    // Step 3: Create filtered dataset keeping only objects from minority classes
+    let filtered_objects: Vec<usize> = dataset.data.iter().enumerate()
+        .filter(|(_, obj_data)| {
+            if let Some(class_val) = obj_data.get(&dataset.class_attribute) {
+                minority_classes.contains(class_val)
+            } else {
+                false // Exclude objects with missing class
+            }
+        })
+        .map(|(idx, _)| idx)
+        .collect();
+    
+    // Create filtered dataset
+    let filtered_objects_names: Vec<String> = filtered_objects.iter()
+        .map(|&obj_idx| dataset.objects[obj_idx].clone())
+        .collect();
+    
+    let filtered_data: Vec<HashMap<String, String>> = filtered_objects.iter()
+        .map(|&obj_idx| dataset.data[obj_idx].clone())
+        .collect();
+    
+    let filtered_dataset = NominalDataset {
+        objects: filtered_objects_names,
+        attributes: dataset.attributes.clone(),
+        class_attribute: dataset.class_attribute.clone(),
+        data: filtered_data,
+    };
+    
+    println!("Keeping {} most minority classes: {:?}", n, minority_classes);
+    println!("Filtered dataset: {} objects (was {})", filtered_dataset.objects.len(), dataset.objects.len());
+
+    // Apply CNC on filtered dataset
+    cnc_core(pertinent_attrs, &filtered_dataset)
 }
 
 /// Display CNC results in a standardized format
