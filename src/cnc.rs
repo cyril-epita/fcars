@@ -437,7 +437,8 @@ pub fn cnc_bp(dataset: &NominalDataset, n: usize) -> CncBpResult {
 
 pub fn display_cnc_chosen_attribute(dataset : &NominalDataset, results : &CncResult) {
 
-    println!("Most pertinent attribute(s): {:?}", results.pertinent_attrs);
+    println!("Most pertinent attribute(s): {:?}", 
+        results.pertinent_attrs);
 
     for pertinent_attr in &results.pertinent_attrs {
 

@@ -239,12 +239,12 @@ mod tests {
         NominalDataset::new(objects, attributes, class_attribute, data)
     }
 
-    fn cnc_run_test(dataset : &NominalDataset) -> CncResult {
+    fn cnc_verbose(dataset : &NominalDataset) -> CncResult {
+
         dataset.display_summary();
-        println!();
-        
         // Run CNC algorithm
         let results = cnc(&dataset);
+        println!();
         display_cnc_chosen_attribute(&dataset, &results);
         display_cnc_results(&dataset, &results.concepts);
 
@@ -255,7 +255,7 @@ mod tests {
     fn cnc_foo() {
 
         let dataset = create_foo_dataset();
-        let results = cnc_run_test(&dataset);
+        let results = cnc_verbose(&dataset);
 
         assert_eq!(8, results.concepts.len());
         //TODO: to add more assert_eq.
@@ -265,7 +265,7 @@ mod tests {
     fn cnc_animal() {
 
         let dataset = create_animal_dataset();
-        let results = cnc_run_test(&dataset);
+        let results = cnc_verbose(&dataset);
     
         assert_eq!(2, results.concepts.len());
         //TODO: to add more assert_eq.
@@ -275,7 +275,7 @@ mod tests {
     fn cnc_weather() {
 
         let dataset = create_weather_dataset();
-        let results = cnc_run_test(&dataset);
+        let results = cnc_verbose(&dataset);
 
         assert_eq!(1, results.concepts.len());
         //TODO: to add more assert_eq.
@@ -338,8 +338,9 @@ mod tests {
         let dataset = create_weather_dataset();
         
         // Test cnc_bp with all classes (should behave like regular CNC)
+        println!("Keeping {} most minority classes.", 2);
         let bp_all_results = cnc_bp(&dataset, 2);
-        println!("Keeping {} most minority classes: {:?}", 2, bp_all_results.minority_classes);
+        println!("The {} most minority classes found are: {:?}", 2, bp_all_results.minority_classes);
         println!("Filtered dataset: {} objects (was {})", bp_all_results.filtered_size, bp_all_results.original_size);
         assert_eq!(1, bp_all_results.cnc_result.concepts.len());
         
