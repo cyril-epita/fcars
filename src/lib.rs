@@ -12,6 +12,7 @@ pub use formal_concept::*;
 pub use formal_context::*;
 
 pub mod cnc;
+pub mod cnc_report;
 
 // Tests
 #[cfg(test)]

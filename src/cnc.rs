@@ -3,8 +3,17 @@ use std::collections::{HashMap, HashSet};
 /// Result structure for CNC containing both the concepts and debug information
 #[derive(Debug)]
 pub struct CncResult {
-    pub concepts: Vec<(String, String, Vec<usize>, HashMap<String, String>)>,
+    pub concepts: Vec<CncConcept>,
     pub pertinent_attrs: Vec<String>,
+}
+
+/// A single concept extracted by CNC.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CncConcept {
+    pub pertinent_attribute: String,
+    pub attribute_value: String,
+    pub extent: Vec<usize>,
+    pub intent: HashMap<String, String>,
 }
 
 /// Result structure for CNC-BP containing both the concepts and debug information
@@ -15,6 +24,23 @@ pub struct CncBpResult {
     pub minority_classes: HashSet<String>,
     pub original_size: usize,
     pub filtered_size: usize,
+}
+
+/// Summary structure used by reporting/export code.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DatasetSummary {
+    pub objects: usize,
+    pub descriptive_attributes: usize,
+    pub class_attribute: String,
+    pub attribute_unique_values: Vec<(String, usize)>,
+    pub class_distribution: Vec<(String, usize, f64)>,
+}
+
+/// Information gain for a descriptive attribute.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttributeInformationGain {
+    pub attribute: String,
+    pub gain: f64,
 }
 
 /// CNC (Classifier Nominal Concept)
@@ -150,32 +176,58 @@ impl NominalDataset {
 
         println!("Context:\n{}", &self);
 
-        // Count descriptive attributes (excluding class)
-        let desc_attrs: Vec<_> = self.attributes.iter()
-            .filter(|attr| attr != &&self.class_attribute)
-            .collect();
-            
+        let summary = summarize_dataset(self);
+        
         println!("Dataset Summary:");
-        println!("- Objects: {}", self.objects.len());
-        println!("- Descriptive attributes: {}", desc_attrs.len());
-        println!("- Class attribute: {}", self.class_attribute);
+        println!("- Objects: {}", summary.objects);
+        println!("- Descriptive attributes: {}", summary.descriptive_attributes);
+        println!("- Class attribute: {}", summary.class_attribute);
         
-        for attr in &desc_attrs {
-            let values = self.get_attribute_values(attr);
-            println!("- Attribute '{}': {} unique values", attr, values.len());
-        }
-        
-        // Show class distribution
-        let class_values = self.get_class_values(&(0..self.objects.len()).collect::<Vec<_>>());
-        let mut class_counts = HashMap::new();
-        for class_val in class_values {
-            *class_counts.entry(class_val).or_insert(0) += 1;
+        for (attr, unique_values) in &summary.attribute_unique_values {
+            println!("- Attribute '{}': {} unique values", attr, unique_values);
         }
         
         println!("- Class distribution:");
-        for (class_val, count) in class_counts {
-            println!("  {}: {} ({:.1}%)", class_val, count, (count as f64 / self.objects.len() as f64) * 100.0);
+        for (class_val, count, percentage) in &summary.class_distribution {
+            println!("  {}: {} ({:.1}%)", class_val, count, percentage);
         }
+    }
+}
+
+/// Build a stable summary of a nominal dataset.
+pub fn summarize_dataset(dataset: &NominalDataset) -> DatasetSummary {
+    let desc_attrs: Vec<_> = dataset.attributes.iter()
+        .filter(|attr| attr != &&dataset.class_attribute)
+        .collect();
+    
+    let attribute_unique_values = desc_attrs.iter()
+        .map(|attr| ((*attr).clone(), dataset.get_attribute_values(attr).len()))
+        .collect();
+    
+    let class_values = dataset.get_class_values(&(0..dataset.objects.len()).collect::<Vec<_>>());
+    let mut class_counts = HashMap::new();
+    for class_val in class_values {
+        *class_counts.entry(class_val).or_insert(0) += 1;
+    }
+    
+    let mut class_distribution: Vec<_> = class_counts.into_iter()
+        .map(|(class_val, count)| {
+            let percentage = if dataset.objects.is_empty() {
+                0.0
+            } else {
+                (count as f64 / dataset.objects.len() as f64) * 100.0
+            };
+            (class_val, count, percentage)
+        })
+        .collect();
+    class_distribution.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    
+    DatasetSummary {
+        objects: dataset.objects.len(),
+        descriptive_attributes: desc_attrs.len(),
+        class_attribute: dataset.class_attribute.clone(),
+        attribute_unique_values,
+        class_distribution,
     }
 }
 
@@ -228,35 +280,47 @@ fn information_gain(dataset: &NominalDataset, attr_name: &str) -> f64 {
     total_entropy - weighted_entropy
 }
 
-/// Find the most pertinent attribute using information gain
-/// Returns all attributes with maximum gain (handles ties)
-fn find_most_pertinent_attributes(dataset: &NominalDataset) -> Vec<String> {
-    let mut attr_gains = Vec::new();
+/// Calculate information gain for each descriptive attribute.
+pub fn attribute_information_gains(dataset: &NominalDataset) -> Vec<AttributeInformationGain> {
+    let mut gains = Vec::new();
     
     for attr_name in &dataset.attributes {
         if attr_name == &dataset.class_attribute {
-            continue; // Skip class attribute
+            continue;
         }
         
-        let gain = information_gain(dataset, attr_name);
-        attr_gains.push((attr_name.clone(), gain));
+        gains.push(AttributeInformationGain {
+            attribute: attr_name.clone(),
+            gain: information_gain(dataset, attr_name),
+        });
     }
     
-    // Find maximum gain
-    let max_gain = attr_gains.iter()
-        .map(|(_, gain)| *gain)
-        .fold(f64::MIN, f64::max);
+    gains.sort_by(|left, right| {
+        right.gain.total_cmp(&left.gain)
+            .then_with(|| left.attribute.cmp(&right.attribute))
+    });
     
-    // Return all attributes with maximum gain
+    gains
+}
+
+/// Find the most pertinent attribute using information gain
+/// Returns all attributes with maximum gain (handles ties)
+fn find_most_pertinent_attributes(dataset: &NominalDataset) -> Vec<String> {
+    let attr_gains = attribute_information_gains(dataset);
+
+    let Some(max_gain) = attr_gains.first().map(|gain| gain.gain) else {
+        return Vec::new();
+    };
+
     attr_gains.into_iter()
-        .filter(|(_, gain)| *gain == max_gain)
-        .map(|(attr, _)| attr)
+        .take_while(|gain| gain.gain.total_cmp(&max_gain).is_eq())
+        .map(|gain| gain.attribute)
         .collect()
 }
 
 /// Find the most frequent values for an attribute
 /// Returns all values with maximum frequency (handles ties)
-fn find_most_frequent_values(dataset: &NominalDataset, attr_name: &str) -> Vec<String> {
+pub(crate) fn most_frequent_values(dataset: &NominalDataset, attr_name: &str) -> Vec<String> {
     let groups = dataset.group_by_attribute_value(attr_name);
     
     if groups.is_empty() {
@@ -340,18 +404,51 @@ fn cnc_core(pertinent_attrs: Vec<String>, dataset: &NominalDataset) -> CncResult
 
     // Step 2 of the CNC algorithm: For each pertinent attribute, find all most frequent values (handle ties)
     for pertinent_attr in &pertinent_attrs {
-        let most_frequent_values = find_most_frequent_values(dataset, pertinent_attr);
+        let most_frequent_values = most_frequent_values(dataset, pertinent_attr);
         
         // Step 3: Compute closure for each attribute-value pair
         for value in &most_frequent_values {
             let (extent, intent) = compute_nominal_closure(dataset, pertinent_attr, value);
-            results.push((pertinent_attr.clone(), value.clone(), extent, intent));
+            results.push(CncConcept {
+                pertinent_attribute: pertinent_attr.clone(),
+                attribute_value: value.clone(),
+                extent,
+                intent,
+            });
         }
     }
     
     CncResult {
         concepts: results,
         pertinent_attrs,
+    }
+}
+
+pub(crate) fn filter_dataset_by_classes(dataset: &NominalDataset, classes: &HashSet<String>) -> NominalDataset {
+    let filtered_objects: Vec<usize> = dataset.data.iter().enumerate()
+        .filter(|(_, obj_data)| {
+            if let Some(class_val) = obj_data.get(&dataset.class_attribute) {
+                classes.contains(class_val)
+            } else {
+                false // Exclude objects with missing class
+            }
+        })
+        .map(|(idx, _)| idx)
+        .collect();
+    
+    let filtered_objects_names: Vec<String> = filtered_objects.iter()
+        .map(|&obj_idx| dataset.objects[obj_idx].clone())
+        .collect();
+    
+    let filtered_data: Vec<HashMap<String, String>> = filtered_objects.iter()
+        .map(|&obj_idx| dataset.data[obj_idx].clone())
+        .collect();
+    
+    NominalDataset {
+        objects: filtered_objects_names,
+        attributes: dataset.attributes.clone(),
+        class_attribute: dataset.class_attribute.clone(),
+        data: filtered_data,
     }
 }
 
@@ -381,7 +478,7 @@ pub fn cnc_bp(dataset: &NominalDataset, n: usize) -> CncBpResult {
     
     // Step 2: Sort classes by frequency (ascending) to find minority classes
     let mut sorted_classes: Vec<_> = class_counts.into_iter().collect();
-    sorted_classes.sort_by_key(|(_, count)| *count);
+    sorted_classes.sort_by(|left, right| left.1.cmp(&right.1).then_with(|| left.0.cmp(&right.0)));
     
     // Get the n most minority class names
     let minority_classes: HashSet<String> = sorted_classes.into_iter()
@@ -390,32 +487,7 @@ pub fn cnc_bp(dataset: &NominalDataset, n: usize) -> CncBpResult {
         .collect();
     
     // Step 3: Create filtered dataset keeping only objects from minority classes
-    let filtered_objects: Vec<usize> = dataset.data.iter().enumerate()
-        .filter(|(_, obj_data)| {
-            if let Some(class_val) = obj_data.get(&dataset.class_attribute) {
-                minority_classes.contains(class_val)
-            } else {
-                false // Exclude objects with missing class
-            }
-        })
-        .map(|(idx, _)| idx)
-        .collect();
-    
-    // Create filtered dataset
-    let filtered_objects_names: Vec<String> = filtered_objects.iter()
-        .map(|&obj_idx| dataset.objects[obj_idx].clone())
-        .collect();
-    
-    let filtered_data: Vec<HashMap<String, String>> = filtered_objects.iter()
-        .map(|&obj_idx| dataset.data[obj_idx].clone())
-        .collect();
-    
-    let filtered_dataset = NominalDataset {
-        objects: filtered_objects_names,
-        attributes: dataset.attributes.clone(),
-        class_attribute: dataset.class_attribute.clone(),
-        data: filtered_data,
-    };
+    let filtered_dataset = filter_dataset_by_classes(dataset, &minority_classes);
 
     // Apply CNC on filtered dataset
     let cnc_result = if pertinent_attrs.is_empty() {
@@ -442,14 +514,14 @@ pub fn display_cnc_chosen_attribute(dataset : &NominalDataset, results : &CncRes
 
     for pertinent_attr in &results.pertinent_attrs {
 
-        let most_frequent_values = dataset.get_attribute_values(pertinent_attr);
+        let most_frequent_values = most_frequent_values(dataset, pertinent_attr);
         println!("  Most frequent value(s) for '{}': {:?}", 
             pertinent_attr, most_frequent_values);
     }
 }
 
 /// Display CNC results in a standardized format
-pub fn display_cnc_results(dataset: &NominalDataset, results: &[(String, String, Vec<usize>, HashMap<String, String>)]) {
+pub fn display_cnc_results(dataset: &NominalDataset, results: &[CncConcept]) {
     if results.is_empty() {
         println!("No concepts found");
         return;
@@ -458,34 +530,34 @@ pub fn display_cnc_results(dataset: &NominalDataset, results: &[(String, String,
     // There is a theroem ("connexion de Galois") saying that A''' = A'.
     println!("\nCNC Results ({} concept(s) found):", results.len());
     
-    for (i, (pertinent_attr, attr_value, extent, intent)) in results.iter().enumerate() {
+    for (i, concept) in results.iter().enumerate() {
         println!("\nConcept {}:", i + 1);
-        println!("  Pertinent attribute: '{}' with value '{}'", pertinent_attr, attr_value);
+        println!("  Pertinent attribute: '{}' with value '{}'", concept.pertinent_attribute, concept.attribute_value);
         
         // Show extent (objects)
-        let extent_objects: Vec<String> = extent.iter()
+        let extent_objects: Vec<String> = concept.extent.iter()
             .map(|&obj_idx| dataset.objects[obj_idx].clone())
             .collect();
         println!("  Extent of the pertinent attribute(s): {:?}", extent_objects);
         println!("  Extent size: {}/{} objects ({:.1}%)", 
-                 extent.len(), dataset.objects.len(), 
-                 (extent.len() as f64 / dataset.objects.len() as f64) * 100.0);
+                 concept.extent.len(), dataset.objects.len(), 
+                 (concept.extent.len() as f64 / dataset.objects.len() as f64) * 100.0);
         
         // Show intent (common attributes)
-        println!("  Intent (common attributes) of the found extent : {:?}", intent);
+        println!("  Intent (common attributes) of the found extent : {:?}", concept.intent);
         let desc_attrs_count = dataset.attributes.iter().filter(|a| *a != &dataset.class_attribute).count();
         println!("  Intent size: {}/{} attributes ({:.1}%)", 
-                 intent.len(), desc_attrs_count,
-                 (intent.len() as f64 / desc_attrs_count as f64) * 100.0);
+                 concept.intent.len(), desc_attrs_count,
+                 (concept.intent.len() as f64 / desc_attrs_count as f64) * 100.0);
         
         // Show class distribution in extent
-        let class_values = dataset.get_class_values(&extent);
+        let class_values = dataset.get_class_values(&concept.extent);
         println!("  Class distribution in extent: {:?}", class_values);
         
         // Show majority class
         if let Some((majority_class, count, percentage)) = NominalDataset::get_majority_class(&class_values) {
             println!("  Majority class: '{}' ({}/{}, {:.1}%)", 
-                     majority_class, count, extent.len(), percentage);
+                     majority_class, count, concept.extent.len(), percentage);
         }
     }
 }

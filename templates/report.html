@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title }}</title>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>{{ page.title }}</h1>
+      <p>{{ page.lead }}</p>
+    </header>
+
+    {% if page.filter_rows.len() != 0 %}
+    <section>
+      <h2>Minority-Class Filter</h2>
+      <table>
+        <tbody>
+          {% for row in page.filter_rows %}
+          <tr>
+            <th>{{ row.label }}</th>
+            <td>{{ row.value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {% for section in page.dataset_sections %}
+    <section>
+      <h2>{{ section.heading }}</h2>
+
+      <h3>Overview</h3>
+      <table>
+        <tbody>
+          {% for row in section.overview_rows %}
+          <tr>
+            <th>{{ row.label }}</th>
+            <td>{{ row.value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3>Context</h3>
+      <table>
+        <thead>
+          <tr>
+            {% for header in section.context_headers %}
+            <th>{{ header }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in section.context_rows %}
+          <tr>
+            {% for value in row %}
+            <td>{{ value }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3>Attribute Cardinalities</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Attribute</th>
+            <th>Unique values</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in section.attribute_rows %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td>{{ row.value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3>Class Distribution</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th>Count</th>
+            <th>Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in section.class_distribution %}
+          <tr>
+            <td>{{ row.name }}</td>
+            <td>{{ row.count }}</td>
+            <td>{{ row.percentage }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endfor %}
+
+    <section>
+      <h2>Information Gain</h2>
+      <p>The selected attributes are the ones chosen as most pertinent by CNC.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Attribute</th>
+            <th>Information gain</th>
+            <th>Chosen</th>
+            <th>Most frequent values</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in page.information_gain_rows %}
+          <tr>
+            <td>{{ row.attribute }}</td>
+            <td>{{ row.gain }}</td>
+            <td>{% if row.chosen %}Yes{% else %}No{% endif %}</td>
+            <td>
+              {% if row.most_frequent_values.len() == 0 %}
+              None
+              {% else %}
+              <ul>
+                {% for value in row.most_frequent_values %}
+                <li>{{ value }}</li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Concepts</h2>
+      <p>{{ page.concept_count }} concept(s) found.</p>
+
+      {% if page.concept_count == 0 %}
+      <p>No concepts found.</p>
+      {% endif %}
+
+      {% for concept in page.concepts %}
+      <article>
+        <h3>{{ concept.title }}</h3>
+
+        <h4>Summary</h4>
+        <table>
+          <tbody>
+            {% for row in concept.summary_rows %}
+            <tr>
+              <th>{{ row.label }}</th>
+              <td>{{ row.value }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <h4>Extent</h4>
+        {% if concept.extent_objects.len() != 0 %}
+        <ul>
+          {% for object in concept.extent_objects %}
+          <li>{{ object }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p>No objects.</p>
+        {% endif %}
+
+        <h4>Intent</h4>
+        {% if concept.intent_rows.len() != 0 %}
+        <table>
+          <thead>
+            <tr>
+              <th>Attribute</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in concept.intent_rows %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td><code>{{ row.value }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p>No common descriptive attributes.</p>
+        {% endif %}
+
+        <h4>Class Distribution in Extent</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Count</th>
+              <th>Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in concept.class_distribution %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.count }}</td>
+              <td>{{ row.percentage }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <p>
+          <strong>Majority class:</strong>
+          {% if concept.majority_summary.len() != 0 %}
+          {{ concept.majority_summary }}
+          {% else %}
+          Unavailable
+          {% endif %}
+        </p>
+      </article>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>
