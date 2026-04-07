@@ -457,7 +457,7 @@ pub fn display_cnc_results(dataset: &NominalDataset, results: &[(String, String,
     }
     
     // There is a theroem ("connexion de Galois") saying that A''' = A'.
-    println!("\nCNC Results ({} concept(s) found):", results.len());
+    println!("\n{} concept(s) found:", results.len());
     
     for (i, (pertinent_attr, attr_value, extent, intent)) in results.iter().enumerate() {
         println!("\nConcept {}:", i + 1);
@@ -481,12 +481,23 @@ pub fn display_cnc_results(dataset: &NominalDataset, results: &[(String, String,
         
         // Show class distribution in extent
         let class_values = dataset.get_class_values(&extent);
-        println!("  Class distribution in extent: {:?}", class_values);
-        
-        // Show majority class
-        if let Some((majority_class, count, percentage)) = NominalDataset::get_majority_class(&class_values) {
-            println!("  Majority class: '{}' ({}/{}, {:.1}%)",
-                     majority_class, count, extent.len(), percentage);
+        let majority_class = NominalDataset::get_majority_class(&class_values)
+            .map(|(class, _, _)| class);
+
+        let mut class_counts: HashMap<String, usize> = HashMap::new();
+        for class_val in &class_values {
+            *class_counts.entry(class_val.clone()).or_insert(0) += 1;
+        }
+
+        println!("  Class distribution in extent:");
+        for (class_val, count) in &class_counts {
+            let percentage = (*count as f64 / extent.len() as f64) * 100.0;
+            let majority_marker = if Some(class_val.clone()) == majority_class {
+                " (majority class)"
+            } else {
+                ""
+            };
+            println!("    {}: {} ({:.1}%){}", class_val, count, percentage, majority_marker);
         }
     }
 }

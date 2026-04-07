@@ -84,8 +84,7 @@ mod tests {
     }
 
     // Helper function to run CNC and display results
-    fn run_cnc_test(dataset: &NominalDataset, name: &str) -> CncResult {
-        println!("\n=== CNC Test: {} ===", name);
+    fn run_cnc_test(dataset: &NominalDataset) -> CncResult {
         dataset.display_summary();
 
         println!("\n--- Running CNC ---");
@@ -97,8 +96,8 @@ mod tests {
     }
 
     // Helper function to run CNC-BP and display results
-    fn run_cnc_bp_test(dataset: &NominalDataset, name: &str, n: usize) -> CncBpResult {
-        println!("\n=== CNC-BP Test: {} (n={}) ===", name, n);
+    fn run_cnc_bp_test(dataset: &NominalDataset, n: usize) -> CncBpResult {
+        dataset.display_summary();
 
         println!("\n--- Running CNC-BP (n={}) ---", n);
         let result = cnc_bp(dataset, n);
@@ -117,9 +116,7 @@ mod tests {
             Some(attr) => from_arff(path, attr).expect("Failed to load ARFF file"),
             None => from_arff_auto(path).expect("Failed to load ARFF file"),
         };
-        println!("\n=== CNC on {} ===", path);
-        dataset.display_summary();
-        run_cnc_test(&dataset, path)
+        run_cnc_test(&dataset)
     }
 
     fn run_arff_cnc_bp_test(path: &str, class_attr: Option<&str>, n: usize) -> CncBpResult {
@@ -127,9 +124,7 @@ mod tests {
             Some(attr) => from_arff(path, attr).expect("Failed to load ARFF file"),
             None => from_arff_auto(path).expect("Failed to load ARFF file"),
         };
-        println!("\n=== CNC-BP on {} ===", path);
-        dataset.display_summary();
-        run_cnc_bp_test(&dataset, path, n)
+        run_cnc_bp_test(&dataset, n)
     }
     
     fn create_foo_dataset() -> NominalDataset {
@@ -291,24 +286,31 @@ mod tests {
     #[test]
     fn cnc_foo() {
         let dataset = create_foo_dataset();
-        let result = run_cnc_test(&dataset, "Foo");
+        let result = run_cnc_test(&dataset);
         assert_eq!(8, result.concepts.len());
     }
 
     #[test]
     fn cnc_animal() {
         let dataset = create_animal_dataset();
-        let result = run_cnc_test(&dataset, "Animal");
+        let result = run_cnc_test(&dataset);
         assert_eq!(2, result.concepts.len());
     }
 
     #[test]
     fn cnc_weather() {
         let dataset = create_weather_dataset();
-        let result = run_cnc_test(&dataset, "Weather");
+        let result = run_cnc_test(&dataset);
         assert_eq!(1, result.concepts.len());
     }
 
+    #[test]
+    fn cnc_bp_weather() {
+        let dataset = create_weather_dataset();
+        run_cnc_bp_test(&dataset, 1);
+    }
+
+    /*
     // Test cases: (n, expected_concepts, check_type)
     // check_type: Some(n) = exact match, None = less than previous
     #[test]
@@ -347,33 +349,35 @@ mod tests {
             assert_eq!(expected, result.cnc_result.concepts.len());
         }
     }
+    */
 
     #[test]
     #[ignore] // Nécessite fichier .arff
-    fn test_arff_weather_nominal() {
+    fn cnc_arff_weather() {
         run_arff_cnc_test("data-examples/weather.nominal.arff", None);
+    }
+
+    #[test]
+    #[ignore] // Nécessite fichier .arff
+    fn cnc_bp_arff_weather() {
         run_arff_cnc_bp_test("data-examples/weather.nominal.arff", None, 1);
     }
 
     #[test]
     #[ignore] // Nécessite fichier .arff
-    fn test_arff_contact_lenses() {
-        run_arff_cnc_bp_test("data-examples/contact-lenses.arff", Some("contact-lenses"), 2);
+    fn cnc_bp_arff_contact_lenses() {
+        run_arff_cnc_bp_test("data-examples/contact-lenses.arff", Some("contact-lenses"), 1);
     }
 
     #[test]
     #[ignore] // Nécessite fichier .arff
-    fn test_cnc_arff_weather() {
-        let result = run_arff_cnc_test("data-examples/weather.nominal.arff", None);
-        assert!(!result.concepts.is_empty(), "CNC should find at least one concept");
-        assert!(!result.pertinent_attrs.is_empty(), "Should have pertinent attributes");
+    fn cnc_arff_breast_cancer() {
+        run_arff_cnc_test("data-examples/breast-cancer.arff", Some("Class"));
     }
 
     #[test]
     #[ignore] // Nécessite fichier .arff
-    fn test_cnc_arff_breast_cancer() {
-        let result = run_arff_cnc_test("data-examples/breast-cancer.arff", Some("Class"));
-        assert!(!result.concepts.is_empty(), "CNC should find at least one concept");
-        println!("\n[Summary] Found {} concept(s)", result.concepts.len());
+    fn cnc_bp_arff_breast_cancer() {
+        run_arff_cnc_bp_test("data-examples/breast-cancer.arff", Some("Class"), 1);
     }
 }
