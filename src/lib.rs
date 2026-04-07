@@ -336,18 +336,65 @@ mod tests {
     #[test]
     fn cnc_bp_weather() {
         let dataset = create_weather_dataset();
-        
+
         // Test cnc_bp with all classes (should behave like regular CNC)
         println!("Keeping {} most minority classes.", 2);
         let bp_all_results = cnc_bp(&dataset, 2);
         println!("The {} most minority classes found are: {:?}", 2, bp_all_results.minority_classes);
         println!("Filtered dataset: {} objects (was {})", bp_all_results.filtered_size, bp_all_results.original_size);
         assert_eq!(1, bp_all_results.cnc_result.concepts.len());
-        
+
         // Test cnc_bp with 1 class (most minority)
         let bp_1_results = cnc_bp(&dataset, 1);
         println!("Keeping {} most minority classes: {:?}", 1, bp_1_results.minority_classes);
         println!("Filtered dataset: {} objects (was {})", bp_1_results.filtered_size, bp_1_results.original_size);
         assert_eq!(1, bp_1_results.cnc_result.concepts.len());
+    }
+
+    #[test]
+    #[ignore] // Ignore par défaut car nécessite un fichier .arff
+    fn test_arff_weather_nominal() {
+        // Test de chargement du fichier weather.nominal.arff
+        let dataset = load_arff_as_nominal(
+            "data-examples/weather.nominal.arff",
+            "play"
+        ).expect("Failed to load ARFF file");
+
+        println!("\n=== Weather Dataset (from ARFF) ===");
+        dataset.display_summary();
+
+        // Exécuter CNC
+        println!("\n--- Running CNC ---");
+        let cnc_result = cnc(&dataset);
+        display_cnc_chosen_attribute(&dataset, &cnc_result);
+        display_cnc_results(&dataset, &cnc_result.concepts);
+
+        // Exécuter CNC-BP avec n=1
+        println!("\n--- Running CNC-BP (n=1) ---");
+        let bp_result = cnc_bp(&dataset, 1);
+        println!("Minority classes kept: {:?}", bp_result.minority_classes);
+        println!("Filtered: {} objects (was {})",
+                 bp_result.filtered_size, bp_result.original_size);
+        display_cnc_results(&dataset, &bp_result.cnc_result.concepts);
+    }
+
+    #[test]
+    #[ignore] // Ignore par défaut car nécessite un fichier .arff
+    fn test_arff_contact_lenses() {
+        // Test avec contact-lenses.arff
+        let dataset = load_arff_as_nominal(
+            "data-examples/contact-lenses.arff",
+            "contact-lenses"
+        ).expect("Failed to load ARFF file");
+
+        println!("\n=== Contact Lenses Dataset (from ARFF) ===");
+        dataset.display_summary();
+
+        println!("\n--- Running CNC-BP (n=2) ---");
+        let bp_result = cnc_bp(&dataset, 2);
+        println!("Minority classes kept: {:?}", bp_result.minority_classes);
+        println!("Filtered: {} objects (was {})",
+                 bp_result.filtered_size, bp_result.original_size);
+        display_cnc_results(&dataset, &bp_result.cnc_result.concepts);
     }
 }

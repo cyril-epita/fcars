@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 
 /// Result structure for CNC containing both the concepts and debug information
 #[derive(Debug)]
@@ -484,8 +485,102 @@ pub fn display_cnc_results(dataset: &NominalDataset, results: &[(String, String,
         
         // Show majority class
         if let Some((majority_class, count, percentage)) = NominalDataset::get_majority_class(&class_values) {
-            println!("  Majority class: '{}' ({}/{}, {:.1}%)", 
+            println!("  Majority class: '{}' ({}/{}, {:.1}%)",
                      majority_class, count, extent.len(), percentage);
         }
     }
+}
+
+/// Load an ARFF file and convert it to NominalDataset
+///
+/// # Arguments
+/// * `file_path` - Path to the .arff file
+/// * `class_attr_name` - Name of the class attribute in the ARFF file
+///
+/// # Returns
+/// A NominalDataset that can be used with CNC/CNC-BP algorithms
+///
+/// # Notes
+/// - This is a simple parser for ARFF files (both nominal and numeric attributes)
+/// - Numeric attributes will be treated as strings (consider discretizing them first for better results)
+/// - Missing values ("?") are kept as-is
+///
+/// # Example
+/// ```no_run
+/// use fcars::cnc::load_arff_as_nominal;
+///
+/// let dataset = load_arff_as_nominal("data/weather.arff", "play").unwrap();
+/// ```
+pub fn load_arff_as_nominal(
+    file_path: &str,
+    class_attr_name: &str,
+) -> Result<NominalDataset, Box<dyn std::error::Error>> {
+    let content = fs::read_to_string(file_path)?;
+
+    let mut attributes = Vec::new();
+    let mut in_data_section = false;
+    let mut objects = Vec::new();
+    let mut data = Vec::new();
+    let mut obj_counter = 0;
+
+    for line in content.lines() {
+        let line = line.trim();
+
+        // Skip comments and empty lines
+        if line.is_empty() || line.starts_with('%') {
+            continue;
+        }
+
+        // Check if we're in the data section
+        if line.to_lowercase().starts_with("@data") {
+            in_data_section = true;
+            continue;
+        }
+
+        if !in_data_section {
+            // Parse attribute declarations
+            if line.to_lowercase().starts_with("@attribute") {
+                // Format: @attribute name type
+                // We just need the name
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let attr_name = parts[1].trim();
+                    attributes.push(attr_name.to_string());
+                }
+            }
+        } else {
+            // Parse data lines (CSV format)
+            let values: Vec<String> = line
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
+
+            if values.len() == attributes.len() {
+                objects.push(format!("obj_{}", obj_counter));
+                obj_counter += 1;
+
+                let mut obj_data = HashMap::new();
+                for (i, value) in values.iter().enumerate() {
+                    obj_data.insert(attributes[i].clone(), value.clone());
+                }
+                data.push(obj_data);
+            }
+        }
+    }
+
+    // Verify class attribute exists
+    if !attributes.contains(&class_attr_name.to_string()) {
+        return Err(format!(
+            "Class attribute '{}' not found. Available: {:?}",
+            class_attr_name, attributes
+        )
+        .into());
+    }
+
+    Ok(NominalDataset::new(
+        objects,
+        attributes,
+        class_attr_name.to_string(),
+        data,
+    ))
 }

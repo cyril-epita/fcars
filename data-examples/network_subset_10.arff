@@ -1,0 +1,68 @@
+% Este arquivo foi gerado pelo IDS - WORKPLACE
+%		Criador: Eduardo Kugler Viegas (eduardo.viegas@ppgia.pucpr.br)
+%		Orientador: Altair Olivo Santin (santin@ppgia.pucpr.br)
+% Para a cria��o do arff completo junte dois arquivos de sa�da, remova o cabe�alho de um arquivo e altere o atributo classe com as classes equivalentes
+@RELATION 'ids_workplace'
+
+@ATTRIBUTE 'ip_type'		numeric
+@ATTRIBUTE 'ip_len'			numeric
+@ATTRIBUTE 'ip_id'			numeric
+@ATTRIBUTE 'ip_offset'		numeric
+@ATTRIBUTE 'ip_RF'			numeric
+@ATTRIBUTE 'ip_DF'			numeric
+@ATTRIBUTE 'ip_MF'			numeric
+@ATTRIBUTE 'ip_proto'          numeric
+@ATTRIBUTE 'ip_checksum'	numeric
+@ATTRIBUTE 'udp_sport'		numeric
+@ATTRIBUTE 'udp_dport'		numeric
+@ATTRIBUTE 'udp_len'		numeric
+@ATTRIBUTE 'udp_chk'		numeric
+@ATTRIBUTE 'icmp_type'		numeric
+@ATTRIBUTE 'icmp_code'		numeric
+@ATTRIBUTE 'icmp_chk'		numeric
+@ATTRIBUTE 'tcp_sport'		numeric
+@ATTRIBUTE 'tcp_dport'		numeric
+@ATTRIBUTE 'tcp_seq'		numeric
+@ATTRIBUTE 'tcp_ack'		numeric
+@ATTRIBUTE 'tcp_ffyn'		numeric
+@ATTRIBUTE 'tcp_fsyn'		numeric
+@ATTRIBUTE 'tcp_frst'		numeric
+@ATTRIBUTE 'tcp_fpush'		numeric
+@ATTRIBUTE 'tcp_fack'		numeric
+@ATTRIBUTE 'tcp_furg'		numeric
+@ATTRIBUTE 'fr_length'		numeric
+@ATTRIBUTE 'conn_status'			numeric
+@ATTRIBUTE 'count_fr_src_dst'			numeric
+@ATTRIBUTE 'count_fr_dst_src'			numeric
+@ATTRIBUTE 'count_serv_src_dst'			numeric
+@ATTRIBUTE 'count_serv_dst_src'			numeric
+@ATTRIBUTE 'num_bytes_src_dst'			numeric
+@ATTRIBUTE 'num_bytes_dst_src'			numeric
+@ATTRIBUTE 'num_bytes_serv_src_dst'			numeric
+@ATTRIBUTE 'num_bytes_serv_dst_src'			numeric
+@ATTRIBUTE 'num_pushed_src_dst'			numeric
+@ATTRIBUTE 'num_pushed_dst_src'			numeric
+@ATTRIBUTE 'num_syn_fin_src_dst'			numeric
+@ATTRIBUTE 'num_syn_fin_dst_src'			numeric
+@ATTRIBUTE 'num_fin_src_dst'			numeric
+@ATTRIBUTE 'num_fin_dst_src'			numeric
+@ATTRIBUTE 'num_ack_src_dst'			numeric
+@ATTRIBUTE 'num_ack_dst_src'			numeric
+@ATTRIBUTE 'num_syn_src_dst'			numeric
+@ATTRIBUTE 'num_syn_dst_src'			numeric
+@ATTRIBUTE 'num_rst_src_dst'			numeric
+@ATTRIBUTE 'num_rst_dst_src'			numeric
+@ATTRIBUTE 'first_packet'			numeric
+@ATTRIBUTE 'first_serv_packet'		numeric
+@ATTRIBUTE 'class'			{normal, attack}
+@DATA
+0,60,46382,0,0,1,0,6,869,0,0,0,0,0,0,0,57615,587,136170096,0,0,1,0,0,0,0,20,4,1,0,1,0,20,0,20,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,normal
+0,60,46952,0,0,1,0,6,299,0,0,0,0,0,0,0,587,57615,845289927,136170097,0,1,0,0,1,0,20,5,1,1,1,1,20,20,20,20,0,0,0,0,0,0,0,1,1,1,0,0,0,0,normal
+0,52,46383,0,0,1,0,6,876,0,0,0,0,0,0,0,57615,587,136170097,845289928,0,0,0,0,1,0,12,6,2,1,2,1,32,20,32,20,0,0,0,0,0,0,1,1,1,1,0,0,0,0,normal
+0,60,51007,0,0,1,0,6,61775,0,0,0,0,0,0,0,33869,587,2897197125,0,0,1,0,0,0,0,20,4,1,0,1,0,20,0,20,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,normal
+0,60,46953,0,0,1,0,6,294,0,0,0,0,0,0,0,587,33869,845460875,2897197126,0,1,0,0,1,0,20,5,1,1,1,1,20,20,20,20,0,0,0,0,0,0,0,1,1,1,0,0,0,0,normal
+0,52,51008,0,0,1,0,6,61782,0,0,0,0,0,0,0,33869,587,2897197126,845460876,0,0,0,0,1,0,12,6,2,1,2,1,32,20,32,20,0,0,0,0,0,0,1,1,1,1,0,0,0,0,normal
+0,75,46954,0,0,0,0,6,16666,0,0,0,0,0,0,0,587,57615,845289928,136170097,0,0,0,0,1,0,35,6,2,2,2,2,32,55,32,55,0,0,0,0,0,0,1,2,1,1,0,0,0,0,normal
+0,75,46955,0,0,0,0,6,16661,0,0,0,0,0,0,0,587,33869,845460876,2897197126,0,0,0,0,1,0,35,6,2,2,2,2,32,55,32,55,0,0,0,0,0,0,1,2,1,1,0,0,0,0,normal
+0,52,46384,0,0,1,0,6,875,0,0,0,0,0,0,0,57615,587,136170097,845289963,0,0,0,0,1,0,12,6,3,2,3,2,44,55,44,55,0,0,0,0,0,0,2,2,1,1,0,0,0,0,normal
+0,52,51009,0,0,1,0,6,61781,0,0,0,0,0,0,0,33869,587,2897197126,845460911,0,0,0,0,1,0,12,6,3,2,3,2,44,55,44,55,0,0,0,0,0,0,2,2,1,1,0,0,0,0,normal
