@@ -82,6 +82,55 @@ mod tests {
         }
         map
     }
+
+    // Helper function to run CNC and display results
+    fn run_cnc_test(dataset: &NominalDataset, name: &str) -> CncResult {
+        println!("\n=== CNC Test: {} ===", name);
+        dataset.display_summary();
+
+        println!("\n--- Running CNC ---");
+        let result = cnc(dataset);
+        display_cnc_chosen_attribute(dataset, &result);
+        display_cnc_results(dataset, &result.concepts);
+
+        result
+    }
+
+    // Helper function to run CNC-BP and display results
+    fn run_cnc_bp_test(dataset: &NominalDataset, name: &str, n: usize) -> CncBpResult {
+        println!("\n=== CNC-BP Test: {} (n={}) ===", name, n);
+
+        println!("\n--- Running CNC-BP (n={}) ---", n);
+        let result = cnc_bp(dataset, n);
+        println!("Minority classes kept: {:?}", result.minority_classes);
+        println!("Filtered: {}/{} objects ({:.1}%)",
+                 result.filtered_size, result.original_size,
+                 (result.filtered_size as f64 / result.original_size as f64) * 100.0);
+        display_cnc_results(dataset, &result.cnc_result.concepts);
+
+        result
+    }
+
+    // Helper for ARFF-based tests
+    fn run_arff_cnc_test(path: &str, class_attr: Option<&str>) -> CncResult {
+        let dataset = match class_attr {
+            Some(attr) => from_arff(path, attr).expect("Failed to load ARFF file"),
+            None => from_arff_auto(path).expect("Failed to load ARFF file"),
+        };
+        println!("\n=== CNC on {} ===", path);
+        dataset.display_summary();
+        run_cnc_test(&dataset, path)
+    }
+
+    fn run_arff_cnc_bp_test(path: &str, class_attr: Option<&str>, n: usize) -> CncBpResult {
+        let dataset = match class_attr {
+            Some(attr) => from_arff(path, attr).expect("Failed to load ARFF file"),
+            None => from_arff_auto(path).expect("Failed to load ARFF file"),
+        };
+        println!("\n=== CNC-BP on {} ===", path);
+        dataset.display_summary();
+        run_cnc_bp_test(&dataset, path, n)
+    }
     
     fn create_foo_dataset() -> NominalDataset {
         let objects = vec![
@@ -239,202 +288,91 @@ mod tests {
         NominalDataset::new(objects, attributes, class_attribute, data)
     }
 
-    fn cnc_verbose(dataset : &NominalDataset) -> CncResult {
-
-        dataset.display_summary();
-        // Run CNC algorithm
-        let results = cnc(&dataset);
-        println!();
-        display_cnc_chosen_attribute(&dataset, &results);
-        display_cnc_results(&dataset, &results.concepts);
-
-        results
-    }
-    
     #[test]
     fn cnc_foo() {
-
         let dataset = create_foo_dataset();
-        let results = cnc_verbose(&dataset);
-
-        assert_eq!(8, results.concepts.len());
-        //TODO: to add more assert_eq.
+        let result = run_cnc_test(&dataset, "Foo");
+        assert_eq!(8, result.concepts.len());
     }
 
     #[test]
     fn cnc_animal() {
-
         let dataset = create_animal_dataset();
-        let results = cnc_verbose(&dataset);
-    
-        assert_eq!(2, results.concepts.len());
-        //TODO: to add more assert_eq.
+        let result = run_cnc_test(&dataset, "Animal");
+        assert_eq!(2, result.concepts.len());
     }
 
     #[test]
     fn cnc_weather() {
-
         let dataset = create_weather_dataset();
-        let results = cnc_verbose(&dataset);
-
-        assert_eq!(1, results.concepts.len());
-        //TODO: to add more assert_eq.
+        let result = run_cnc_test(&dataset, "Weather");
+        assert_eq!(1, result.concepts.len());
     }
 
+    // Test cases: (n, expected_concepts, check_type)
+    // check_type: Some(n) = exact match, None = less than previous
     #[test]
     fn cnc_bp_foo() {
         let dataset = create_foo_dataset();
-        
-        // Test cnc_bp with all classes (should behave like regular CNC)
-        let bp_all_results = cnc_bp(&dataset, 3);
-        println!("Keeping {} most minority classes: {:?}", 3, bp_all_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_all_results.filtered_size, bp_all_results.original_size);
-        assert_eq!(8, bp_all_results.cnc_result.concepts.len());
-        
-        // Test cnc_bp with n > total classes (should behave like all classes)
-        let bp_overflow_results = cnc_bp(&dataset, 5);
-        println!("Keeping {} most minority classes: {:?}", 5, bp_overflow_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_overflow_results.filtered_size, bp_overflow_results.original_size);
-        assert_eq!(8, bp_overflow_results.cnc_result.concepts.len());
-        
-        // Test cnc_bp with 2 classes (two most minority)
-        let bp_2_results = cnc_bp(&dataset, 2);
-        println!("Keeping {} most minority classes: {:?}", 2, bp_2_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_2_results.filtered_size, bp_2_results.original_size);
-        assert_eq!(8, bp_2_results.cnc_result.concepts.len());
-        
-        // Test cnc_bp with 1 class (most minority)
-        let bp_1_results = cnc_bp(&dataset, 1);
-        println!("Keeping {} most minority classes: {:?}", 1, bp_1_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_1_results.filtered_size, bp_1_results.original_size);
-        assert!(bp_1_results.cnc_result.concepts.len() < 8);
+        let test_cases = [(3, 8), (5, 8), (2, 8)]; // (n, expected)
+
+        for (n, expected) in test_cases {
+            let result = run_cnc_bp_test(&dataset, "Foo", n);
+            assert_eq!(expected, result.cnc_result.concepts.len());
+        }
+
+        // n=1 should have fewer concepts
+        let result = run_cnc_bp_test(&dataset, "Foo", 1);
+        assert!(result.cnc_result.concepts.len() < 8);
     }
-    
+
     #[test]
     fn cnc_bp_animal() {
         let dataset = create_animal_dataset();
-        
-        // Test cnc_bp with all classes
-        let bp_all_results = cnc_bp(&dataset, 3);
-        println!("Keeping {} most minority classes: {:?}", 3, bp_all_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_all_results.filtered_size, bp_all_results.original_size);
-        assert_eq!(2, bp_all_results.cnc_result.concepts.len());
-        
-        // Test cnc_bp with 2 classes (two most minority)
-        let bp_2_results = cnc_bp(&dataset, 2);
-        println!("Keeping {} most minority classes: {:?}", 2, bp_2_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_2_results.filtered_size, bp_2_results.original_size);
-        assert_eq!(2, bp_2_results.cnc_result.concepts.len());
-        
-        // Test cnc_bp with 1 class (most minority)
-        let bp_1_results = cnc_bp(&dataset, 1);
-        println!("Keeping {} most minority classes: {:?}", 1, bp_1_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_1_results.filtered_size, bp_1_results.original_size);
-        assert_eq!(2, bp_1_results.cnc_result.concepts.len());
+        let test_cases = [(3, 2), (2, 2), (1, 2)];
+
+        for (n, expected) in test_cases {
+            let result = run_cnc_bp_test(&dataset, "Animal", n);
+            assert_eq!(expected, result.cnc_result.concepts.len());
+        }
     }
-    
+
     #[test]
     fn cnc_bp_weather() {
         let dataset = create_weather_dataset();
+        let test_cases = [(2, 1), (1, 1)];
 
-        // Test cnc_bp with all classes (should behave like regular CNC)
-        println!("Keeping {} most minority classes.", 2);
-        let bp_all_results = cnc_bp(&dataset, 2);
-        println!("The {} most minority classes found are: {:?}", 2, bp_all_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_all_results.filtered_size, bp_all_results.original_size);
-        assert_eq!(1, bp_all_results.cnc_result.concepts.len());
-
-        // Test cnc_bp with 1 class (most minority)
-        let bp_1_results = cnc_bp(&dataset, 1);
-        println!("Keeping {} most minority classes: {:?}", 1, bp_1_results.minority_classes);
-        println!("Filtered dataset: {} objects (was {})", bp_1_results.filtered_size, bp_1_results.original_size);
-        assert_eq!(1, bp_1_results.cnc_result.concepts.len());
+        for (n, expected) in test_cases {
+            let result = run_cnc_bp_test(&dataset, "Weather", n);
+            assert_eq!(expected, result.cnc_result.concepts.len());
+        }
     }
 
     #[test]
-    #[ignore] // Ignore par défaut car nécessite un fichier .arff
+    #[ignore] // Nécessite fichier .arff
     fn test_arff_weather_nominal() {
-        // Test de chargement du fichier weather.nominal.arff
-        // from_arff_auto utilise le dernier attribut comme classe (convention ARFF)
-        let dataset = from_arff_auto(
-            "data-examples/weather.nominal.arff"
-        ).expect("Failed to load ARFF file");
-
-        println!("\n=== Weather Dataset (from ARFF) ===");
-        dataset.display_summary();
-
-        // Exécuter CNC
-        println!("\n--- Running CNC ---");
-        let cnc_result = cnc(&dataset);
-        display_cnc_chosen_attribute(&dataset, &cnc_result);
-        display_cnc_results(&dataset, &cnc_result.concepts);
-
-        // Exécuter CNC-BP avec n=1
-        println!("\n--- Running CNC-BP (n=1) ---");
-        let bp_result = cnc_bp(&dataset, 1);
-        println!("Minority classes kept: {:?}", bp_result.minority_classes);
-        println!("Filtered: {} objects (was {})",
-                 bp_result.filtered_size, bp_result.original_size);
-        display_cnc_results(&dataset, &bp_result.cnc_result.concepts);
+        run_arff_cnc_test("data-examples/weather.nominal.arff", None);
+        run_arff_cnc_bp_test("data-examples/weather.nominal.arff", None, 1);
     }
 
     #[test]
-    #[ignore] // Ignore par défaut car nécessite un fichier .arff
+    #[ignore] // Nécessite fichier .arff
     fn test_arff_contact_lenses() {
-        // Test avec contact-lenses.arff
-        // from_arff permet de spécifier explicitement l'attribut classe
-        let dataset = from_arff(
-            "data-examples/contact-lenses.arff",
-            "contact-lenses"
-        ).expect("Failed to load ARFF file");
-
-        println!("\n=== Contact Lenses Dataset (from ARFF) ===");
-        dataset.display_summary();
-
-        println!("\n--- Running CNC-BP (n=2) ---");
-        let bp_result = cnc_bp(&dataset, 2);
-        println!("Minority classes kept: {:?}", bp_result.minority_classes);
-        println!("Filtered: {} objects (was {})",
-                 bp_result.filtered_size, bp_result.original_size);
-        display_cnc_results(&dataset, &bp_result.cnc_result.concepts);
+        run_arff_cnc_bp_test("data-examples/contact-lenses.arff", Some("contact-lenses"), 2);
     }
 
     #[test]
-    #[ignore] // Ignore par défaut car nécessite un fichier .arff
+    #[ignore] // Nécessite fichier .arff
     fn test_cnc_arff_weather() {
-        // Test CNC (sans BP) sur weather.nominal.arff
-        let dataset = from_arff_auto("data-examples/weather.nominal.arff")
-            .expect("Failed to load ARFF file");
-
-        println!("\n=== CNC on Weather Dataset (from ARFF) ===");
-        dataset.display_summary();
-
-        println!("\n--- Running CNC ---");
-        let result = cnc(&dataset);
-        display_cnc_chosen_attribute(&dataset, &result);
-        display_cnc_results(&dataset, &result.concepts);
-
-        // Vérifications
+        let result = run_arff_cnc_test("data-examples/weather.nominal.arff", None);
         assert!(!result.concepts.is_empty(), "CNC should find at least one concept");
         assert!(!result.pertinent_attrs.is_empty(), "Should have pertinent attributes");
     }
 
     #[test]
-    #[ignore] // Ignore par défaut car nécessite un fichier .arff
+    #[ignore] // Nécessite fichier .arff
     fn test_cnc_arff_breast_cancer() {
-        // Test CNC sur breast-cancer.arff avec attribut de classe explicite
-        let dataset = from_arff("data-examples/breast-cancer.arff", "Class")
-            .expect("Failed to load ARFF file");
-
-        println!("\n=== CNC on Breast Cancer Dataset (from ARFF) ===");
-        dataset.display_summary();
-
-        println!("\n--- Running CNC ---");
-        let result = cnc(&dataset);
-        display_cnc_chosen_attribute(&dataset, &result);
-        display_cnc_results(&dataset, &result.concepts);
-
-        // Vérifications
+        let result = run_arff_cnc_test("data-examples/breast-cancer.arff", Some("Class"));
         assert!(!result.concepts.is_empty(), "CNC should find at least one concept");
         println!("\n[Summary] Found {} concept(s)", result.concepts.len());
     }
