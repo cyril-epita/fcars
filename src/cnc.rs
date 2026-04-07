@@ -507,11 +507,11 @@ pub fn display_cnc_results(dataset: &NominalDataset, results: &[(String, String,
 ///
 /// # Example
 /// ```no_run
-/// use fcars::cnc::load_arff_as_nominal;
+/// use fcars::cnc::from_arff;
 ///
-/// let dataset = load_arff_as_nominal("data/weather.arff", "play").unwrap();
+/// let dataset = from_arff("data/weather.arff", "play").unwrap();
 /// ```
-pub fn load_arff_as_nominal(
+pub fn from_arff(
     file_path: &str,
     class_attr_name: &str,
 ) -> Result<NominalDataset, Box<dyn std::error::Error>> {
@@ -583,4 +583,54 @@ pub fn load_arff_as_nominal(
         class_attr_name.to_string(),
         data,
     ))
+}
+
+/// Load an ARFF file using the last attribute as class (ARFF convention)
+///
+/// This is a convenience function that calls `from_arff` with the last attribute
+/// as the class attribute, following the common ARFF convention.
+///
+/// # Arguments
+/// * `file_path` - Path to the .arff file
+///
+/// # Returns
+/// A NominalDataset that can be used with CNC/CNC-BP algorithms
+///
+/// # Example
+/// ```no_run
+/// use fcars::cnc::from_arff_auto;
+///
+/// // Uses the last attribute as class
+/// let dataset = from_arff_auto("data/weather.arff").unwrap();
+/// ```
+pub fn from_arff_auto(
+    file_path: &str,
+) -> Result<NominalDataset, Box<dyn std::error::Error>> {
+    // First, we need to read the file to get the last attribute
+    let content = fs::read_to_string(file_path)?;
+
+    let mut attributes = Vec::new();
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('%') {
+            continue;
+        }
+        if line.to_lowercase().starts_with("@data") {
+            break;
+        }
+        if line.to_lowercase().starts_with("@attribute") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                attributes.push(parts[1].trim().to_string());
+            }
+        }
+    }
+
+    if attributes.is_empty() {
+        return Err("No attributes found in ARFF file".into());
+    }
+
+    let class_attr = attributes.last().unwrap();
+    from_arff(file_path, class_attr)
 }

@@ -355,9 +355,9 @@ mod tests {
     #[ignore] // Ignore par défaut car nécessite un fichier .arff
     fn test_arff_weather_nominal() {
         // Test de chargement du fichier weather.nominal.arff
-        let dataset = load_arff_as_nominal(
-            "data-examples/weather.nominal.arff",
-            "play"
+        // from_arff_auto utilise le dernier attribut comme classe (convention ARFF)
+        let dataset = from_arff_auto(
+            "data-examples/weather.nominal.arff"
         ).expect("Failed to load ARFF file");
 
         println!("\n=== Weather Dataset (from ARFF) ===");
@@ -382,7 +382,8 @@ mod tests {
     #[ignore] // Ignore par défaut car nécessite un fichier .arff
     fn test_arff_contact_lenses() {
         // Test avec contact-lenses.arff
-        let dataset = load_arff_as_nominal(
+        // from_arff permet de spécifier explicitement l'attribut classe
+        let dataset = from_arff(
             "data-examples/contact-lenses.arff",
             "contact-lenses"
         ).expect("Failed to load ARFF file");
